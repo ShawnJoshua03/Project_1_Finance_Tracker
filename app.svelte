@@ -1,9 +1,10 @@
 <script>
   import { onMount } from 'svelte';
-  import { Chart, BarController, BarElement, CategoryScale, LinearScale, Title, Tooltip, Legend } from 'chart.js';
+  import { Chart, BarController, BarElement, CategoryScale, LinearScale, Title, Tooltip, Legend, PieController, ArcElement } from 'chart.js';
 
-  // Register required components from Chart.js
-  Chart.register(BarController, BarElement, CategoryScale, LinearScale, Title, Tooltip, Legend);
+// Register required components from Chart.js
+Chart.register(BarController, BarElement, CategoryScale, LinearScale, Title, Tooltip, Legend, PieController, ArcElement);
+
 
   // Preset expenses categories
   const PRESET_EXPENSES = [
@@ -48,37 +49,47 @@
     updateInvestmentChart();
   }
 
-  // Calculate the total expenses
   function totalExpenses() {
-    const presetTotal = PRESET_EXPENSES.reduce((total, expense) => total + expense.amount, 0);
-    const otherTotal = otherExpenses.reduce((total, expense) => total + expense.amount, 0);
-    return presetTotal + otherTotal;
-  }
+  const presetTotal = PRESET_EXPENSES.reduce((total, expense) => total + expense.amount, 0);
+  const otherTotal = otherExpenses.reduce((total, expense) => total + expense.amount, 0);
+  return presetTotal + otherTotal; // Ensure the total is the sum of both preset and other expenses
+}
+
 
   // Update the expense chart
   function updateExpenseChart() {
-    if (expenseChart) {
-      const labels = ['Income', ...PRESET_EXPENSES.map(e => e.label), 'Other'];
-      const expensesData = [
-        income,
-        ...PRESET_EXPENSES.map(e => e.amount),
-        otherExpenses.reduce((total, expense) => total + expense.amount, 0)
-      ];
+  if (expenseChart) {
+    expenseChart.data.labels = ['Income', ...PRESET_EXPENSES.map(e => e.label), 'Other'];
+    expenseChart.data.datasets[0].data = [
+      income,
+      ...PRESET_EXPENSES.map(e => e.amount),
+      otherExpenses.reduce((total, expense) => total + expense.amount, 0)
+    ];
+    expenseChart.update(); // Update the bar chart
 
-      expenseChart.data.labels = labels;
-      expenseChart.data.datasets[0].data = [income, ...expensesData.slice(1)];
-      expenseChart.update(); // Update the chart
+    // Update the pie chart for expenses
+    if (expensesPieChart) {
+      expensesPieChart.data.datasets[0].data = PRESET_EXPENSES.map(e => e.amount).concat(otherExpenses.reduce((total, expense) => total + expense.amount, 0));
+      expensesPieChart.update();
     }
   }
+}
+
+
 
   // Update the investment chart
   function updateInvestmentChart() {
-    if (investmentChart) {
-      investmentChart.data.labels = INVESTMENTS.map(i => i.label);
-      investmentChart.data.datasets[0].data = INVESTMENTS.map(i => i.amount);
-      investmentChart.update(); // Update the chart with new data
-    }
+  if (investmentChart) {
+    investmentChart.data.labels = INVESTMENTS.map(i => i.label);
+    investmentChart.data.datasets[0].data = INVESTMENTS.map(i => i.amount);
+    investmentChart.update(); // Update the bar chart
+
+    // Update the pie chart for investments
+    investmentsPieChart.data.datasets[0].data = INVESTMENTS.map(i => i.amount);
+    investmentsPieChart.update();
   }
+}
+
 
   // Initialize charts on mount
   onMount(() => {
@@ -132,36 +143,85 @@
       }
     });
   });
+  let expensesPieCanvas, investmentsPieCanvas;
+let expensesPieChart, investmentsPieChart;
+
+// Initialize Pie Charts in onMount
+onMount(() => {
+  // Expenses Pie Chart
+  expensesPieChart = new Chart(expensesPieCanvas, {
+    type: 'pie',
+    data: {
+      labels: PRESET_EXPENSES.map(e => e.label).concat('Other'),
+      datasets: [{
+        data: PRESET_EXPENSES.map(e => e.amount).concat(otherExpenses.reduce((total, expense) => total + expense.amount, 0)),
+        backgroundColor: ['rgba(54, 162, 235, 0.2)', 'rgba(255, 159, 64, 0.2)', 'rgba(75, 192, 192, 0.2)', 'rgba(153, 102, 255, 0.2)'],
+        borderColor: ['rgba(54, 162, 235, 1)', 'rgba(255, 159, 64, 1)', 'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)'],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true
+    }
+  });
+
+  // Investments Pie Chart
+  investmentsPieChart = new Chart(investmentsPieCanvas, {
+    type: 'pie',
+    data: {
+      labels: INVESTMENTS.map(i => i.label),
+      datasets: [{
+        data: INVESTMENTS.map(i => i.amount),
+        backgroundColor: ['rgba(75, 192, 192, 0.2)', 'rgba(153, 102, 255, 0.2)', 'rgba(255, 206, 86, 0.2)'],
+        borderColor: ['rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 206, 86, 1)'],
+        borderWidth: 1
+      }]
+      
+    },
+    options: {
+      responsive: true
+    }
+  });
+});
+
 </script>
 
 <main>
   <h1>Smart Expense & Investment Tracker</h1>
 
+
   <!-- Income Section -->
-  <section>
-    <h2>Set Your Income</h2>
-    <input bind:value={income} type="number" placeholder="Enter Total Income" />
-    <p>Total Income: ${income}</p>
-  </section>
+<section>
+  <h2>Set Your Income</h2>
+  <input bind:value={income} type="number" placeholder="Enter Total Income" />
+  <p>Total Income: ${income}</p>
+</section>
+
+
 
   <!-- Preset Expenses Section -->
-  <section>
-    <h2>Preset Expenses</h2>
-    <div>
-      {#each PRESET_EXPENSES as expense, index}
+<section>
+  <h2>Preset Expenses</h2>
+  <div>
+    {#each PRESET_EXPENSES as expense, index}
+      <div class="expense-item">
         <label for="preset-{index}">{expense.label}: $</label>
         <input id="preset-{index}" type="number" on:input={(e) => addPresetExpense(index, e.currentTarget.value)} placeholder={`Enter ${expense.label} amount`} />
-      {/each}
-    </div>
-  </section>
+      </div>
+    {/each}
+  </div>
+</section>
+
+
 
   <!-- Other Expenses Section -->
-  <section>
-    <h2>Add Other Expenses</h2>
-    <input bind:value={expenseDescription} placeholder="Other Expense Description" />
-    <input bind:value={expenseAmount} type="number" placeholder="Other Expense Amount" />
-    <button on:click={addOtherExpense}>Add Other Expense</button>
-  </section>
+<section>
+  <h2>Add Other Expenses</h2>
+  <input bind:value={expenseDescription} placeholder="Other Expense Description" />
+  <input bind:value={expenseAmount} type="number" placeholder="Other Expense Amount" />
+  <button on:click={addOtherExpense}>Add Other Expense</button>
+</section>
+
 
   <!-- Investments Section -->
   <section>
@@ -180,16 +240,29 @@
   </section>
 
   <!-- Canvas for Expense Chart -->
-  <section>
+  <section class="chart-section">
     <h3>Expense Chart</h3>
     <canvas bind:this={expenseCanvas} width="400" height="200"></canvas>
   </section>
+
+  <!-- Canvas for the Expenses Pie Chart -->
+<section>
+  <h3>Expenses Pie Chart</h3>
+  <canvas bind:this={expensesPieCanvas} width="400" height="200"></canvas>
+</section>
 
   <!-- Canvas for Investment Chart -->
   <section>
     <h3>Investment Chart</h3>
     <canvas bind:this={investmentCanvas} width="400" height="200"></canvas>
   </section>
+
+  <!-- Canvas for the Investments Pie Chart -->
+<section>
+  <h3>Investments Pie Chart</h3>
+  <canvas bind:this={investmentsPieCanvas} width="400" height="200"></canvas>
+</section>
+
 </main>
 
 <style>
@@ -240,4 +313,22 @@
     height: 300px;
     background-color: lightgray;
   }
+  .expense-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.expense-item label {
+  width: 120px;
+  text-align: left;
+  margin-right: 1rem;
+}
+
+.expense-item input {
+  flex: 1;
+  padding: 0.5rem;
+}
+
 </style>
